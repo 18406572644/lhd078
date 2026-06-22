@@ -53,7 +53,7 @@ const handleSubmit = async () => {
     }
     await api.post('/tools', {
       ...form.value,
-      images: JSON.stringify(imageUrls),
+      images: imageUrls,
     })
     message.success('发布成功')
     router.push({ name: 'tools' })

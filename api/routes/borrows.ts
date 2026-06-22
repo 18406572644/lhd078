@@ -7,11 +7,45 @@ const router = Router()
 router.post('/', authMiddleware, (req: Request, res: Response): void => {
   try {
     const { tool_id, start_date, end_date } = req.body
-    if (!tool_id || !start_date || !end_date) {
-      res.status(400).json({ success: false, error: '工具ID、开始日期和结束日期为必填项' })
+    if (tool_id === undefined || tool_id === null || tool_id === '') {
+      res.status(400).json({ success: false, error: '工具ID为必填项' })
       return
     }
-    const tool = db.prepare('SELECT * FROM tools WHERE id = ?').get(tool_id) as any
+    if (!start_date || start_date === '') {
+      res.status(400).json({ success: false, error: '开始日期为必填项' })
+      return
+    }
+    if (!end_date || end_date === '') {
+      res.status(400).json({ success: false, error: '结束日期为必填项' })
+      return
+    }
+    const toolId = Number(tool_id)
+    if (isNaN(toolId) || toolId < 1) {
+      res.status(400).json({ success: false, error: '工具ID格式不正确' })
+      return
+    }
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/
+    if (!dateRegex.test(start_date)) {
+      res.status(400).json({ success: false, error: '开始日期格式不正确，应为 YYYY-MM-DD' })
+      return
+    }
+    if (!dateRegex.test(end_date)) {
+      res.status(400).json({ success: false, error: '结束日期格式不正确，应为 YYYY-MM-DD' })
+      return
+    }
+    const start = new Date(start_date)
+    const end = new Date(end_date)
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    if (start < today) {
+      res.status(400).json({ success: false, error: '开始日期不能早于今天' })
+      return
+    }
+    if (end <= start) {
+      res.status(400).json({ success: false, error: '结束日期必须晚于开始日期' })
+      return
+    }
+    const tool = db.prepare('SELECT * FROM tools WHERE id = ?').get(toolId) as any
     if (!tool) {
       res.status(404).json({ success: false, error: '工具不存在' })
       return
@@ -25,12 +59,13 @@ router.post('/', authMiddleware, (req: Request, res: Response): void => {
       return
     }
     const result = db.prepare('INSERT INTO borrows (tool_id, borrower_id, start_date, end_date, deposit_amount) VALUES (?, ?, ?, ?, ?)').run(
-      tool_id, req.user!.id, start_date, end_date, tool.deposit
+      toolId, req.user!.id, start_date, end_date, tool.deposit
     )
     const borrow = db.prepare('SELECT * FROM borrows WHERE id = ?').get(result.lastInsertRowid) as any
     createNotification(tool.user_id, '收到借用申请', `有人申请借用您的工具「${tool.name}」`, 'borrow')
     res.json({ success: true, data: borrow })
   } catch (error) {
+    console.error('提交借用申请失败:', error)
     res.status(500).json({ success: false, error: '提交借用申请失败' })
   }
 })

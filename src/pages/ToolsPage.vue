@@ -39,11 +39,12 @@ const fetchTools = async () => {
   loading.value = true
   try {
     const params: any = { page: page.value, pageSize: pageSize.value, sort: sort.value }
-    if (keyword.value) params.keyword = keyword.value
-    if (categoryId.value) params.categoryId = categoryId.value
+    if (keyword.value && keyword.value.trim()) params.keyword = keyword.value.trim()
+    if (categoryId.value !== null) params.category_id = categoryId.value
     const { data } = await api.get('/tools', { params })
-    tools.value = data.data || []
-    total.value = tools.value.length
+    const result = data.data || data || []
+    tools.value = Array.isArray(result) ? result : []
+    total.value = data.total !== undefined ? Number(data.total) : tools.value.length
   } catch { /* ignore */ }
   loading.value = false
 }

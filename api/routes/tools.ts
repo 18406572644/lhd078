@@ -6,21 +6,73 @@ const router = Router()
 
 router.get('/', (req: Request, res: Response): void => {
   try {
-    const { category_id, keyword, status } = req.query
+    const { category_id, keyword, status, sort, page, pageSize } = req.query
     let sql = `SELECT t.*, u.name as user_name, c.name as category_name
       FROM tools t
       LEFT JOIN users u ON t.user_id = u.id
       LEFT JOIN categories c ON t.category_id = c.id
       WHERE 1=1`
     const params: any[] = []
-    if (category_id) { sql += ' AND t.category_id = ?'; params.push(category_id) }
-    if (keyword) { sql += ' AND t.name LIKE ?'; params.push(`%${keyword}%`) }
-    if (status !== undefined) { sql += ' AND t.status = ?'; params.push(status) }
-    sql += ' ORDER BY t.created_at DESC'
+    if (category_id !== undefined && category_id !== null && category_id !== '') {
+      const catId = Number(category_id)
+      if (!isNaN(catId) && catId > 0) {
+        sql += ' AND t.category_id = ?'
+        params.push(catId)
+      }
+    }
+    if (keyword && keyword !== '') {
+      sql += ' AND t.name LIKE ?'
+      params.push(`%${keyword}%`)
+    }
+    if (status !== undefined && status !== '') {
+      const statusVal = Number(status)
+      if (!isNaN(statusVal)) {
+        sql += ' AND t.status = ?'
+        params.push(statusVal)
+      }
+    }
+    let orderSql = ' ORDER BY t.created_at DESC'
+    if (sort === 'hot') {
+      orderSql = ' ORDER BY t.borrow_count DESC, t.created_at DESC'
+    } else if (sort === 'deposit_asc') {
+      orderSql = ' ORDER BY t.deposit ASC, t.created_at DESC'
+    } else if (sort === 'deposit_desc') {
+      orderSql = ' ORDER BY t.deposit DESC, t.created_at DESC'
+    }
+    sql += orderSql
+    const pageNum = page ? Number(page) : 1
+    const size = pageSize ? Number(pageSize) : 12
+    if (!isNaN(pageNum) && !isNaN(size) && pageNum > 0 && size > 0) {
+      const offset = (pageNum - 1) * size
+      sql += ' LIMIT ? OFFSET ?'
+      params.push(size, offset)
+    }
     const tools = db.prepare(sql).all(...params) as any[]
     tools.forEach(t => { try { t.images = JSON.parse(t.images) } catch { t.images = [] } })
-    res.json({ success: true, data: tools })
+    let countSql = `SELECT COUNT(*) as total FROM tools t WHERE 1=1`
+    const countParams: any[] = []
+    if (category_id !== undefined && category_id !== null && category_id !== '') {
+      const catId = Number(category_id)
+      if (!isNaN(catId) && catId > 0) {
+        countSql += ' AND t.category_id = ?'
+        countParams.push(catId)
+      }
+    }
+    if (keyword && keyword !== '') {
+      countSql += ' AND t.name LIKE ?'
+      countParams.push(`%${keyword}%`)
+    }
+    if (status !== undefined && status !== '') {
+      const statusVal = Number(status)
+      if (!isNaN(statusVal)) {
+        countSql += ' AND t.status = ?'
+        countParams.push(statusVal)
+      }
+    }
+    const countResult = db.prepare(countSql).get(...countParams) as { total: number }
+    res.json({ success: true, data: tools, total: countResult.total })
   } catch (error) {
+    console.error('获取工具列表失败:', error)
     res.status(500).json({ success: false, error: '获取工具列表失败' })
   }
 })
@@ -72,17 +124,35 @@ router.get('/:id', (req: Request, res: Response): void => {
 router.post('/', authMiddleware, (req: Request, res: Response): void => {
   try {
     const { name, category_id, description, deposit, images } = req.body
-    if (!name || !category_id) {
-      res.status(400).json({ success: false, error: '工具名称和分类为必填项' })
+    if (!name || name.trim() === '') {
+      res.status(400).json({ success: false, error: '工具名称为必填项' })
       return
     }
-    const result = db.prepare('INSERT INTO tools (user_id, name, category_id, description, deposit, images) VALUES (?, ?, ?, ?, ?, ?)').run(
-      req.user!.id, name, category_id, description || '', deposit || 0, JSON.stringify(images || [])
+    if (category_id === undefined || category_id === null || category_id === '') {
+      res.status(400).json({ success: false, error: '工具分类为必填项' })
+      return
+    }
+    const categoryId = Number(category_id)
+    if (isNaN(categoryId) || categoryId < 1) {
+      res.status(400).json({ success: false, error: '工具分类格式不正确' })
+      return
+    }
+    const depositAmount = deposit !== undefined && deposit !== null ? Number(deposit) : 0
+    if (isNaN(depositAmount) || depositAmount < 0) {
+      res.status(400).json({ success: false, error: '押金金额格式不正确' })
+      return
+    }
+    const imagesArray = Array.isArray(images) ? images : []
+    const isAdmin = req.user!.role === 1
+    const initialStatus = isAdmin ? 1 : 0
+    const result = db.prepare('INSERT INTO tools (user_id, name, category_id, description, deposit, images, status) VALUES (?, ?, ?, ?, ?, ?, ?)').run(
+      req.user!.id, name.trim(), categoryId, description || '', depositAmount, JSON.stringify(imagesArray), initialStatus
     )
     const tool = db.prepare('SELECT * FROM tools WHERE id = ?').get(result.lastInsertRowid) as any
     try { tool.images = JSON.parse(tool.images) } catch { tool.images = [] }
     res.json({ success: true, data: tool })
   } catch (error) {
+    console.error('发布工具失败:', error)
     res.status(500).json({ success: false, error: '发布工具失败' })
   }
 })

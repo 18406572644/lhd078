@@ -48,9 +48,9 @@ const submitBorrow = async () => {
   submitting.value = true
   try {
     await api.post('/borrows', {
-      toolId: tool.value.id,
-      startDate: new Date(dateRange.value[0]).toISOString(),
-      endDate: new Date(dateRange.value[1]).toISOString(),
+      tool_id: tool.value.id,
+      start_date: new Date(dateRange.value[0]).toISOString().split('T')[0],
+      end_date: new Date(dateRange.value[1]).toISOString().split('T')[0],
     })
     message.success('借用申请已提交')
   } catch (e: any) {
