@@ -4,6 +4,17 @@ import { authMiddleware, adminMiddleware } from '../middleware/auth.js'
 
 const router = Router()
 
+function recordSearchKeyword(keyword: string) {
+  if (!keyword || keyword.trim() === '') return
+  const trimmedKeyword = keyword.trim().toLowerCase()
+  const existing = db.prepare('SELECT id FROM search_keywords WHERE keyword = ?').get(trimmedKeyword) as any
+  if (existing) {
+    db.prepare('UPDATE search_keywords SET search_count = search_count + 1, last_searched_at = datetime(\'now\') WHERE id = ?').run(existing.id)
+  } else {
+    db.prepare('INSERT INTO search_keywords (keyword) VALUES (?)').run(trimmedKeyword)
+  }
+}
+
 router.get('/', (req: Request, res: Response): void => {
   try {
     const { category_id, keyword, status, sort, page, pageSize } = req.query
@@ -23,6 +34,7 @@ router.get('/', (req: Request, res: Response): void => {
     if (keyword && keyword !== '') {
       sql += ' AND t.name LIKE ?'
       params.push(`%${keyword}%`)
+      recordSearchKeyword(keyword as string)
     }
     if (status !== undefined && status !== '') {
       const statusVal = Number(status)
@@ -230,6 +242,21 @@ router.put('/:id/status', authMiddleware, (req: Request, res: Response): void =>
     res.json({ success: true, data: updated })
   } catch (error) {
     res.status(500).json({ success: false, error: '更新工具状态失败' })
+  }
+})
+
+router.get('/hot-keywords', (req: Request, res: Response): void => {
+  try {
+    const { limit } = req.query
+    const keywords = db.prepare(`
+      SELECT keyword, search_count
+      FROM search_keywords
+      ORDER BY search_count DESC, last_searched_at DESC
+      LIMIT ?
+    `).all(Number(limit) || 10) as any[]
+    res.json({ success: true, data: keywords })
+  } catch (error) {
+    res.status(500).json({ success: false, error: '获取热门搜索词失败' })
   }
 })
 

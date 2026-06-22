@@ -1,14 +1,16 @@
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue'
+import { ref, onMounted, watch, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { NInput, NButton, NTag, NSpin, NPagination, NSpace, NGrid, NGi, NEmpty } from 'naive-ui'
-import { Search, SlidersHorizontal } from 'lucide-vue-next'
+import { Search, SlidersHorizontal, Clock, X } from 'lucide-vue-next'
 import ToolCard from '@/components/ToolCard.vue'
 import { useApi } from '@/composables/useApi'
+import { useSearch } from '@/composables/useSearch'
 
 const { api } = useApi()
 const route = useRoute()
 const router = useRouter()
+const { searchHistory, addToHistory, removeFromHistory, clearHistory, loadSearchHistory } = useSearch()
 
 const loading = ref(false)
 const tools = ref<any[]>([])
@@ -18,6 +20,7 @@ const pageSize = ref(12)
 const keyword = ref((route.query.keyword as string) || '')
 const categoryId = ref<number | null>(null)
 const sort = ref('latest')
+const showHistoryPanel = ref(false)
 
 const categories = [
   { id: null, name: '全部' },
@@ -50,8 +53,29 @@ const fetchTools = async () => {
 }
 
 const handleSearch = () => {
+  if (keyword.value && keyword.value.trim()) {
+    addToHistory(keyword.value)
+  }
   page.value = 1
   fetchTools()
+  showHistoryPanel.value = false
+}
+
+const handleQuickSearch = (kw: string) => {
+  keyword.value = kw
+  handleSearch()
+}
+
+const handleRemoveHistory = (e: Event, kw: string) => {
+  e.stopPropagation()
+  removeFromHistory(kw)
+}
+
+const handleClickOutside = (e: MouseEvent) => {
+  const target = e.target as HTMLElement
+  if (!target.closest('.tools-search-container')) {
+    showHistoryPanel.value = false
+  }
 }
 
 const selectCategory = (id: number | null) => {
@@ -72,7 +96,16 @@ const handlePageChange = (p: number) => {
   window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
-onMounted(fetchTools)
+onMounted(() => {
+  loadSearchHistory()
+  fetchTools()
+  document.addEventListener('click', handleClickOutside)
+})
+
+onBeforeUnmount(() => {
+  document.removeEventListener('click', handleClickOutside)
+})
+
 watch(() => route.query.keyword, (val) => {
   if (val) {
     keyword.value = val as string
@@ -98,11 +131,51 @@ watch(() => route.query.keyword, (val) => {
             {{ cat.name }}
           </NButton>
         </div>
-        <div class="flex gap-2 flex-1 w-full md:w-auto">
-          <NInput v-model:value="keyword" placeholder="搜索工具..." clearable @keyup.enter="handleSearch">
+        <div class="tools-search-container flex gap-2 flex-1 w-full md:w-auto relative">
+          <NInput
+            v-model:value="keyword"
+            placeholder="搜索工具..."
+            clearable
+            @focus="showHistoryPanel = true"
+            @keyup.enter="handleSearch"
+          >
             <template #prefix><Search :size="16" class="text-warm-brown" /></template>
           </NInput>
           <NButton type="primary" @click="handleSearch">搜索</NButton>
+
+          <div
+            v-if="showHistoryPanel && searchHistory.length > 0"
+            class="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl shadow-lg p-4 z-50"
+          >
+            <div class="flex items-center justify-between mb-2">
+              <div class="flex items-center gap-1.5 text-sm font-medium text-warm-dark">
+                <Clock :size="14" class="text-warm-brown" />
+                <span>搜索历史</span>
+              </div>
+              <button
+                class="text-xs text-warm-dark/40 hover:text-warm-orange transition-colors flex items-center gap-1"
+                @click="clearHistory"
+              >
+                清空历史
+              </button>
+            </div>
+            <div class="flex flex-wrap gap-2">
+              <div
+                v-for="item in searchHistory"
+                :key="item"
+                class="flex items-center gap-1 px-2.5 py-1 bg-warm-brown/5 rounded-full text-sm text-warm-dark/70 hover:bg-warm-orange/10 hover:text-warm-orange cursor-pointer transition-colors group"
+                @click="handleQuickSearch(item)"
+              >
+                <Clock :size="12" class="text-warm-brown/50" />
+                <span>{{ item }}</span>
+                <X
+                  :size="12"
+                  class="text-warm-dark/30 hover:text-warm-orange opacity-0 group-hover:opacity-100 transition-opacity ml-0.5"
+                  @click="handleRemoveHistory($event, item)"
+                />
+              </div>
+            </div>
+          </div>
         </div>
         <div class="flex gap-1">
           <NButton

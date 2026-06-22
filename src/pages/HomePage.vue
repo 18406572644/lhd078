@@ -1,15 +1,17 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
-import { NInput, NButton, NSpin, NCarousel } from 'naive-ui'
-import { Search, Trophy, Wrench, Heart, Bell, ChevronRight, Calendar, Store, Gift, Sparkles } from 'lucide-vue-next'
+import { NInput, NButton, NSpin, NTag } from 'naive-ui'
+import { Search, Trophy, Wrench, Heart, Bell, ChevronRight, Calendar, Store, Gift, Sparkles, Clock, TrendingUp, X } from 'lucide-vue-next'
 import ToolCard from '@/components/ToolCard.vue'
 import HelpCard from '@/components/HelpCard.vue'
 import DecorativeElements from '@/components/DecorativeElements.vue'
 import { useApi } from '@/composables/useApi'
+import { useSearch } from '@/composables/useSearch'
 
 const { api } = useApi()
 const router = useRouter()
+const { searchHistory, hotKeywords, addToHistory, removeFromHistory, clearHistory, initSearch } = useSearch()
 
 const loading = ref(true)
 const hotTools = ref<any[]>([])
@@ -19,6 +21,7 @@ const notices = ref<any[]>([])
 const latestActivities = ref<any[]>([])
 const hotShopItems = ref<any[]>([])
 const searchKeyword = ref('')
+const showSearchPanel = ref(false)
 
 const formatDateTime = (dt: string) => {
   if (!dt) return ''
@@ -47,12 +50,40 @@ const fetchHome = async () => {
 }
 
 const handleSearch = () => {
+  if (searchKeyword.value && searchKeyword.value.trim()) {
+    addToHistory(searchKeyword.value)
+  }
   router.push({ name: 'tools', query: { keyword: searchKeyword.value } })
+  showSearchPanel.value = false
+}
+
+const handleQuickSearch = (keyword: string) => {
+  searchKeyword.value = keyword
+  handleSearch()
+}
+
+const handleRemoveHistory = (e: Event, keyword: string) => {
+  e.stopPropagation()
+  removeFromHistory(keyword)
 }
 
 const medalIcons = ['🥇', '🥈', '🥉']
 
-onMounted(fetchHome)
+const handleClickOutside = (e: MouseEvent) => {
+  const target = e.target as HTMLElement
+  if (!target.closest('.search-container')) {
+    showSearchPanel.value = false
+  }
+}
+
+onMounted(async () => {
+  await Promise.all([fetchHome(), initSearch(10)])
+  document.addEventListener('click', handleClickOutside)
+})
+
+onBeforeUnmount(() => {
+  document.removeEventListener('click', handleClickOutside)
+})
 </script>
 
 <template>
@@ -66,17 +97,75 @@ onMounted(fetchHome)
             温馨邻里
           </h1>
           <p class="text-warm-dark/60 text-lg mb-8">社区工具共享与互助平台 — 让邻里之间共享资源、互帮互助</p>
-          <div class="flex gap-2 max-w-md mx-auto">
+          <div class="search-container flex gap-2 max-w-md mx-auto relative">
             <NInput
               v-model:value="searchKeyword"
               placeholder="搜索工具..."
               size="large"
               round
+              @focus="showSearchPanel = true"
               @keyup.enter="handleSearch"
             >
               <template #prefix><Search :size="18" class="text-warm-brown" /></template>
             </NInput>
             <NButton type="primary" size="large" round @click="handleSearch" class="warm-btn">搜索</NButton>
+
+            <div
+              v-if="showSearchPanel && (hotKeywords.length > 0 || searchHistory.length > 0)"
+              class="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl shadow-lg p-4 z-50 text-left"
+              @click.self="showSearchPanel = false"
+            >
+              <div v-if="hotKeywords.length > 0" class="mb-4">
+                <div class="flex items-center gap-1.5 text-sm font-medium text-warm-dark mb-2">
+                  <TrendingUp :size="14" class="text-warm-orange" />
+                  <span>热门搜索</span>
+                </div>
+                <div class="flex flex-wrap gap-2">
+                  <NTag
+                    v-for="(item, idx) in hotKeywords"
+                    :key="item.keyword"
+                    size="small"
+                    :type="idx < 3 ? 'warning' : 'default'"
+                    class="cursor-pointer hover:scale-105 transition-transform"
+                    @click="handleQuickSearch(item.keyword)"
+                  >
+                    <span v-if="idx < 3" class="font-bold mr-1">{{ idx + 1 }}</span>
+                    {{ item.keyword }}
+                  </NTag>
+                </div>
+              </div>
+
+              <div v-if="searchHistory.length > 0">
+                <div class="flex items-center justify-between mb-2">
+                  <div class="flex items-center gap-1.5 text-sm font-medium text-warm-dark">
+                    <Clock :size="14" class="text-warm-brown" />
+                    <span>搜索历史</span>
+                  </div>
+                  <button
+                    class="text-xs text-warm-dark/40 hover:text-warm-orange transition-colors flex items-center gap-1"
+                    @click="clearHistory"
+                  >
+                    清空历史
+                  </button>
+                </div>
+                <div class="flex flex-wrap gap-2">
+                  <div
+                    v-for="item in searchHistory"
+                    :key="item"
+                    class="flex items-center gap-1 px-2.5 py-1 bg-warm-brown/5 rounded-full text-sm text-warm-dark/70 hover:bg-warm-orange/10 hover:text-warm-orange cursor-pointer transition-colors group"
+                    @click="handleQuickSearch(item)"
+                  >
+                    <Clock :size="12" class="text-warm-brown/50" />
+                    <span>{{ item }}</span>
+                    <X
+                      :size="12"
+                      class="text-warm-dark/30 hover:text-warm-orange opacity-0 group-hover:opacity-100 transition-opacity ml-0.5"
+                      @click="handleRemoveHistory($event, item)"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>

@@ -172,6 +172,14 @@ db.exec(`
     related_type TEXT,
     created_at TEXT DEFAULT (datetime('now'))
   );
+
+  CREATE TABLE IF NOT EXISTS search_keywords (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    keyword TEXT NOT NULL UNIQUE,
+    search_count INTEGER DEFAULT 1,
+    last_searched_at TEXT DEFAULT (datetime('now')),
+    created_at TEXT DEFAULT (datetime('now'))
+  );
 `)
 
 const categoryCount = db.prepare('SELECT COUNT(*) as count FROM categories').get() as { count: number }
