@@ -1,23 +1,22 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import type { UserInfo } from '@/composables/useAuth'
-import { useApi } from '@/composables/useApi'
+import { api } from '@/composables/useApi'
+import { clearAuth, setAuth, getToken, getUser } from '@/utils/auth'
 
 export const useUserStore = defineStore('user', () => {
-  const { api } = useApi()
-
-  const user = ref<UserInfo | null>(null)
-  const token = ref<string | null>(localStorage.getItem('token'))
+  const user = ref<UserInfo | null>(getUser())
+  const token = ref<string | null>(getToken())
   const isLoggedIn = computed(() => !!token.value)
   const isAdmin = computed(() => user.value?.role === 1)
 
   const login = async (phone: string, password: string) => {
     const { data } = await api.post('/auth/login', { phone, password })
-    token.value = data.token
-    user.value = data.user
-    localStorage.setItem('token', data.token)
-    localStorage.setItem('user', JSON.stringify(data.user))
-    return data
+    const result = data.data || data
+    token.value = result.token
+    user.value = result.user
+    setAuth(result.token, result.user)
+    return result
   }
 
   const register = async (params: { phone: string; password: string; name: string; address: string }) => {
@@ -28,15 +27,15 @@ export const useUserStore = defineStore('user', () => {
   const logout = () => {
     token.value = null
     user.value = null
-    localStorage.removeItem('token')
-    localStorage.removeItem('user')
+    clearAuth()
   }
 
   const getProfile = async () => {
     try {
       const { data } = await api.get('/auth/profile')
-      user.value = data
-      localStorage.setItem('user', JSON.stringify(data))
+      const result = data.data || data
+      user.value = result
+      setAuth(token.value!, result)
     } catch {
       logout()
     }
@@ -44,9 +43,9 @@ export const useUserStore = defineStore('user', () => {
 
   const initAuth = () => {
     if (token.value) {
-      const saved = localStorage.getItem('user')
+      const saved = getUser()
       if (saved) {
-        try { user.value = JSON.parse(saved) } catch { /* ignore */ }
+        user.value = saved
       }
       getProfile()
     }

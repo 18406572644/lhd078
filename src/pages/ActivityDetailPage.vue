@@ -18,14 +18,16 @@ const hasJoined = ref(false)
 const showConfirmModal = ref(false)
 const joinLoading = ref(false)
 
-const statusMap: Record<number, { text: string; type: 'default' | 'success' | 'warning' | 'error' | 'info' }> = {
+const statusMap: Record<number, { text: string; type: 'default' | 'success' | 'warning' | 'error' | 'info' | 'primary' }> = {
   0: { text: '未开放', type: 'default' },
   1: { text: '报名中', type: 'success' },
   2: { text: '进行中', type: 'info' },
   3: { text: '已结束', type: 'warning' },
 }
 
-const activityStatus = computed(() => activity.value ? (statusMap[activity.value.status] || { text: '未知', type: 'default' }) : { text: '未知', type: 'default' })
+const activityStatus = computed((): { text: string; type: 'default' | 'success' | 'warning' | 'error' | 'info' | 'primary' } => {
+  return activity.value ? (statusMap[activity.value.status] || { text: '未知', type: 'default' }) : { text: '未知', type: 'default' }
+})
 
 const formatDateTime = (dt: string) => {
   if (!dt) return ''

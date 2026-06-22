@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { NMenu, NAvatar, NBadge, NDropdown, NSpace, NButton } from 'naive-ui'
 import { Home, Wrench, Heart, Bell, User, LogOut, Shield, Plus, Calendar, Store } from 'lucide-vue-next'
@@ -13,16 +13,27 @@ const userStore = useUserStore()
 const unreadCount = ref(0)
 
 onMounted(() => {
-  userStore.initAuth()
   if (userStore.isLoggedIn) {
     fetchUnread()
   }
 })
 
+watch(
+  () => userStore.isLoggedIn,
+  (newVal) => {
+    if (newVal) {
+      fetchUnread()
+    } else {
+      unreadCount.value = 0
+    }
+  },
+)
+
 const fetchUnread = async () => {
   try {
     const { data } = await api.get('/notifications/unread')
-    unreadCount.value = data.count || 0
+    const result = data.data || data
+    unreadCount.value = result.count || 0
   } catch { /* ignore */ }
 }
 
