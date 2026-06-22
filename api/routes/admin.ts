@@ -102,6 +102,32 @@ router.get('/stats', (req: Request, res: Response): void => {
       WHERE created_at >= date('now', '-6 months')
       GROUP BY strftime('%Y-%m', created_at)
       ORDER BY month ASC`).all() as any[]
+
+    const toolPublishTrend = db.prepare(`
+      SELECT date(created_at) as date, COUNT(*) as count
+      FROM tools
+      WHERE created_at >= date('now', '-29 days')
+      GROUP BY date(created_at)
+      ORDER BY date ASC
+    `).all() as any[]
+
+    const borrowTrend = db.prepare(`
+      SELECT date(created_at) as date, COUNT(*) as count
+      FROM borrows
+      WHERE created_at >= date('now', '-29 days')
+      GROUP BY date(created_at)
+      ORDER BY date ASC
+    `).all() as any[]
+
+    const categoryBorrowStats = db.prepare(`
+      SELECT c.id, c.name, COUNT(b.id) as count
+      FROM categories c
+      LEFT JOIN tools t ON t.category_id = c.id
+      LEFT JOIN borrows b ON b.tool_id = t.id
+      GROUP BY c.id, c.name
+      ORDER BY count DESC
+    `).all() as any[]
+
     res.json({
       success: true,
       data: {
@@ -109,7 +135,10 @@ router.get('/stats', (req: Request, res: Response): void => {
         totalTools,
         totalBorrows,
         activeBorrows,
-        monthlyTrend
+        monthlyTrend,
+        toolPublishTrend,
+        borrowTrend,
+        categoryBorrowStats
       }
     })
   } catch (error) {
