@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue'
+import { ref, onMounted, watch, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { NMenu, NAvatar, NBadge, NDropdown, NSpace, NButton } from 'naive-ui'
 import { Home, Wrench, Heart, Bell, User, LogOut, Shield, Plus, Calendar, Store } from 'lucide-vue-next'
@@ -11,6 +11,21 @@ const router = useRouter()
 const route = useRoute()
 const userStore = useUserStore()
 const unreadCount = ref(0)
+
+const navItems = computed(() => {
+  const items = [
+    { name: 'home', label: '首页' },
+    { name: 'tools', label: '工具大厅' },
+    { name: 'activities', label: '社区活动' },
+    { name: 'shop', label: '积分商城' },
+    { name: 'help', label: '互助广场' },
+    { name: 'notices', label: '公告栏' },
+  ]
+  if (userStore.isAdmin) {
+    items.push({ name: 'admin', label: '后台管理' })
+  }
+  return items
+})
 
 onMounted(() => {
   if (userStore.isLoggedIn) {
@@ -53,12 +68,18 @@ const handleMenuUpdate = (key: string) => {
   router.push({ name: key })
 }
 
-const userDropdownOptions = [
-  { label: '个人中心', key: 'profile' },
-  { label: '我的借用', key: 'borrows' },
-  { label: '发布工具', key: 'publish' },
-  { label: '退出登录', key: 'logout' },
-]
+const userDropdownOptions = computed(() => {
+  const options = [
+    { label: '个人中心', key: 'profile' },
+    { label: '我的借用', key: 'borrows' },
+    { label: '发布工具', key: 'publish' },
+  ]
+  if (userStore.isAdmin) {
+    options.push({ label: '后台管理', key: 'admin' })
+  }
+  options.push({ label: '退出登录', key: 'logout' })
+  return options
+})
 
 const handleUserAction = (key: string) => {
   if (key === 'logout') {
@@ -85,14 +106,7 @@ const handleUserAction = (key: string) => {
 
         <nav class="hidden md:flex items-center gap-1">
           <router-link
-            v-for="item in [
-              { name: 'home', label: '首页' },
-              { name: 'tools', label: '工具大厅' },
-              { name: 'activities', label: '社区活动' },
-              { name: 'shop', label: '积分商城' },
-              { name: 'help', label: '互助广场' },
-              { name: 'notices', label: '公告栏' },
-            ]"
+            v-for="item in navItems"
             :key="item.name"
             :to="{ name: item.name }"
             class="px-4 py-2 rounded-lg text-sm font-medium transition-colors"

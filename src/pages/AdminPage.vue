@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, computed, onBeforeUnmount, shallowRef, watch } from 'vue'
+import { ref, onMounted, computed, onBeforeUnmount, shallowRef, watch, nextTick } from 'vue'
 import { NTabs, NTabPane, NCard, NGrid, NGi, NDataTable, NButton, NSpin, NTag, NSpace, NModal, NForm, NFormItem, NInput, NInputNumber, NSelect, NDatePicker } from 'naive-ui'
 import { Users, Wrench, Repeat, Activity, TrendingUp, PieChart, Calendar, Store, Gift, Plus, Edit2, Trash2, Coins } from 'lucide-vue-next'
 import { useApi } from '@/composables/useApi'
@@ -291,6 +291,33 @@ const updateCategoryPieChart = () => {
   categoryPieChart.setOption(option)
 }
 
+const disposeAllCharts = () => {
+  publishTrendChart?.dispose()
+  borrowTrendChart?.dispose()
+  categoryPieChart?.dispose()
+  publishTrendChart = null
+  borrowTrendChart = null
+  categoryPieChart = null
+}
+
+const initAllCharts = () => {
+  if (publishTrendChartRef.value) {
+    if (publishTrendChart) publishTrendChart.dispose()
+    publishTrendChart = echarts.init(publishTrendChartRef.value)
+    updatePublishTrendChart()
+  }
+  if (borrowTrendChartRef.value) {
+    if (borrowTrendChart) borrowTrendChart.dispose()
+    borrowTrendChart = echarts.init(borrowTrendChartRef.value)
+    updateBorrowTrendChart()
+  }
+  if (categoryPieChartRef.value) {
+    if (categoryPieChart) categoryPieChart.dispose()
+    categoryPieChart = echarts.init(categoryPieChartRef.value)
+    updateCategoryPieChart()
+  }
+}
+
 const handleResize = () => {
   publishTrendChart?.resize()
   borrowTrendChart?.resize()
@@ -331,6 +358,10 @@ const fetchAdminData = async () => {
     if (redeemRes.status === 'fulfilled') redemptions.value = redeemRes.value.data?.data || []
   } catch { /* ignore */ }
   loading.value = false
+  if (activeTab.value === 'stats') {
+    await nextTick()
+    initAllCharts()
+  }
 }
 
 const openCreateActivity = () => {
@@ -534,29 +565,23 @@ const statCards = [
   { key: 'activeBorrows', label: '活跃借用', icon: Activity, color: 'text-blue-500' },
 ] as const
 
-watch(activeTab, (newVal) => {
+watch(activeTab, async (newVal) => {
   if (newVal === 'stats') {
-    setTimeout(() => {
-      if (!publishTrendChart && publishTrendChartRef.value) initPublishTrendChart()
-      else updatePublishTrendChart()
-      if (!borrowTrendChart && borrowTrendChartRef.value) initBorrowTrendChart()
-      else updateBorrowTrendChart()
-      if (!categoryPieChart && categoryPieChartRef.value) initCategoryPieChart()
-      else updateCategoryPieChart()
-    }, 50)
+    await nextTick()
+    initAllCharts()
   }
 })
 
 watch(() => stats.value.toolPublishTrend, () => {
-  if (activeTab.value === 'stats') updatePublishTrendChart()
+  if (activeTab.value === 'stats' && publishTrendChart) updatePublishTrendChart()
 }, { deep: true })
 
 watch(() => stats.value.borrowTrend, () => {
-  if (activeTab.value === 'stats') updateBorrowTrendChart()
+  if (activeTab.value === 'stats' && borrowTrendChart) updateBorrowTrendChart()
 }, { deep: true })
 
 watch(() => stats.value.categoryBorrowStats, () => {
-  if (activeTab.value === 'stats') updateCategoryPieChart()
+  if (activeTab.value === 'stats' && categoryPieChart) updateCategoryPieChart()
 }, { deep: true })
 
 onMounted(() => {
@@ -566,9 +591,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   window.removeEventListener('resize', handleResize)
-  publishTrendChart?.dispose()
-  borrowTrendChart?.dispose()
-  categoryPieChart?.dispose()
+  disposeAllCharts()
 })
 </script>
 
