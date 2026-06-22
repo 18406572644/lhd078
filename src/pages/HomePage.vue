@@ -2,7 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { NInput, NButton, NSpin, NCarousel } from 'naive-ui'
-import { Search, Trophy, Wrench, Heart, Bell, ChevronRight } from 'lucide-vue-next'
+import { Search, Trophy, Wrench, Heart, Bell, ChevronRight, Calendar, Store, Gift, Sparkles } from 'lucide-vue-next'
 import ToolCard from '@/components/ToolCard.vue'
 import HelpCard from '@/components/HelpCard.vue'
 import DecorativeElements from '@/components/DecorativeElements.vue'
@@ -16,21 +16,32 @@ const hotTools = ref<any[]>([])
 const helpRequests = ref<any[]>([])
 const rankings = ref<any[]>([])
 const notices = ref<any[]>([])
+const latestActivities = ref<any[]>([])
+const hotShopItems = ref<any[]>([])
 const searchKeyword = ref('')
+
+const formatDateTime = (dt: string) => {
+  if (!dt) return ''
+  return dt.slice(5, 16).replace('T', ' ')
+}
 
 const fetchHome = async () => {
   loading.value = true
   try {
-    const [toolsRes, helpRes, rankRes, noticeRes] = await Promise.allSettled([
+    const [toolsRes, helpRes, rankRes, noticeRes, actRes, shopRes] = await Promise.allSettled([
       api.get('/tools/hot', { params: { limit: 4 } }),
       api.get('/help-requests', { params: { limit: 3 } }),
       api.get('/tools/rankings', { params: { limit: 10 } }),
       api.get('/notices', { params: { limit: 5 } }),
+      api.get('/activities', { params: { status: 1, limit: 3 } }),
+      api.get('/shop/items', { params: { limit: 4 } }),
     ])
     if (toolsRes.status === 'fulfilled') hotTools.value = toolsRes.value.data?.data || []
     if (helpRes.status === 'fulfilled') helpRequests.value = helpRes.value.data?.data || []
     if (rankRes.status === 'fulfilled') rankings.value = rankRes.value.data?.data || []
     if (noticeRes.status === 'fulfilled') notices.value = noticeRes.value.data?.data || []
+    if (actRes.status === 'fulfilled') latestActivities.value = (actRes.value.data?.data || []).slice(0, 3)
+    if (shopRes.status === 'fulfilled') hotShopItems.value = (shopRes.value.data?.data || []).slice(0, 4)
   } catch { /* ignore */ }
   loading.value = false
 }
@@ -108,6 +119,89 @@ onMounted(fetchHome)
             </div>
             <div v-if="!helpRequests.length && !loading" class="warm-card-static p-8 text-center text-warm-dark/40">
               暂无互助信息
+            </div>
+          </section>
+
+          <section>
+            <div class="flex items-center justify-between mb-6">
+              <h2 class="section-title flex items-center gap-2">
+                <Calendar :size="22" class="text-warm-orange" />
+                社区活动
+              </h2>
+              <NButton text type="primary" @click="router.push({ name: 'activities' })">
+                查看更多 <ChevronRight :size="16" />
+              </NButton>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div
+                v-for="act in latestActivities" :key="act.id"
+                class="warm-card overflow-hidden cursor-pointer group"
+                @click="router.push({ name: 'activityDetail', params: { id: act.id } })"
+              >
+                <div class="relative h-36 overflow-hidden bg-warm-brown/10">
+                  <img
+                    v-if="act.image"
+                    :src="act.image"
+                    :alt="act.title"
+                    class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                  />
+                  <Calendar v-else :size="32" class="w-full h-full text-warm-orange/40 p-8" />
+                  <div class="absolute top-2 right-2 bg-warm-orange text-white text-xs px-2 py-0.5 rounded-full flex items-center gap-1">
+                    <Gift :size="10" /> +{{ act.points_reward }}
+                  </div>
+                </div>
+                <div class="p-3">
+                  <h3 class="font-medium text-warm-dark text-sm mb-1 line-clamp-1 group-hover:text-warm-orange transition-colors">
+                    {{ act.title }}
+                  </h3>
+                  <p class="text-xs text-warm-dark/50 flex items-center gap-1">
+                    <Calendar :size="12" /> {{ formatDateTime(act.start_time) }}
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div v-if="!latestActivities.length && !loading" class="warm-card-static p-8 text-center text-warm-dark/40">
+              暂无活动
+            </div>
+          </section>
+
+          <section>
+            <div class="flex items-center justify-between mb-6">
+              <h2 class="section-title flex items-center gap-2">
+                <Store :size="22" class="text-warm-orange" />
+                积分商城
+              </h2>
+              <NButton text type="primary" @click="router.push({ name: 'shop' })">
+                查看更多 <ChevronRight :size="16" />
+              </NButton>
+            </div>
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              <div
+                v-for="item in hotShopItems" :key="item.id"
+                class="warm-card overflow-hidden cursor-pointer group"
+                @click="router.push({ name: 'shop' })"
+              >
+                <div class="relative h-28 overflow-hidden bg-warm-brown/10">
+                  <img
+                    v-if="item.image"
+                    :src="item.image"
+                    :alt="item.name"
+                    class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                  />
+                  <Gift v-else :size="28" class="w-full h-full text-warm-orange/40 p-6" />
+                </div>
+                <div class="p-2.5">
+                  <h3 class="text-sm text-warm-dark font-medium line-clamp-1 group-hover:text-warm-orange transition-colors mb-1">
+                    {{ item.name }}
+                  </h3>
+                  <p class="text-warm-orange font-bold text-sm flex items-center gap-0.5">
+                    <Sparkles :size="12" /> {{ item.points_cost }}
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div v-if="!hotShopItems.length && !loading" class="warm-card-static p-8 text-center text-warm-dark/40">
+              暂无商品
             </div>
           </section>
 

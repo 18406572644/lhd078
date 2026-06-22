@@ -17,6 +17,9 @@ import noticeRoutes from './routes/notices.js'
 import notificationRoutes from './routes/notifications.js'
 import adminRoutes from './routes/admin.js'
 import uploadRoutes from './routes/upload.js'
+import activityRoutes from './routes/activities.js'
+import shopRoutes from './routes/shop.js'
+import pointsRoutes from './routes/points.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -39,6 +42,9 @@ app.use('/api/notices', noticeRoutes)
 app.use('/api/notifications', notificationRoutes)
 app.use('/api/admin', adminRoutes)
 app.use('/api/upload', uploadRoutes)
+app.use('/api/activities', activityRoutes)
+app.use('/api/shop', shopRoutes)
+app.use('/api/points', pointsRoutes)
 
 app.use('/api/health', (req: Request, res: Response): void => {
   res.status(200).json({ success: true, message: 'ok' })

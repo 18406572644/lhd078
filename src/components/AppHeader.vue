@@ -2,7 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { NMenu, NAvatar, NBadge, NDropdown, NSpace, NButton } from 'naive-ui'
-import { Home, Wrench, Heart, Bell, User, LogOut, Shield, Plus } from 'lucide-vue-next'
+import { Home, Wrench, Heart, Bell, User, LogOut, Shield, Plus, Calendar, Store } from 'lucide-vue-next'
 import { useUserStore } from '@/stores/user'
 import { useApi } from '@/composables/useApi'
 
@@ -77,6 +77,8 @@ const handleUserAction = (key: string) => {
             v-for="item in [
               { name: 'home', label: '首页' },
               { name: 'tools', label: '工具大厅' },
+              { name: 'activities', label: '社区活动' },
+              { name: 'shop', label: '积分商城' },
               { name: 'help', label: '互助广场' },
               { name: 'notices', label: '公告栏' },
             ]"

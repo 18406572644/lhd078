@@ -114,6 +114,64 @@ db.exec(`
     status INTEGER DEFAULT 0,
     created_at TEXT DEFAULT (datetime('now'))
   );
+
+  CREATE TABLE IF NOT EXISTS activities (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    description TEXT NOT NULL,
+    image TEXT DEFAULT '',
+    location TEXT NOT NULL,
+    start_time TEXT NOT NULL,
+    end_time TEXT NOT NULL,
+    max_participants INTEGER DEFAULT 50,
+    points_reward INTEGER DEFAULT 20,
+    status INTEGER DEFAULT 1,
+    creator_id INTEGER NOT NULL REFERENCES users(id),
+    created_at TEXT DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS activity_participants (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    activity_id INTEGER NOT NULL REFERENCES activities(id),
+    user_id INTEGER NOT NULL REFERENCES users(id),
+    status INTEGER DEFAULT 0,
+    points_awarded INTEGER DEFAULT 0,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS shop_items (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    description TEXT NOT NULL,
+    image TEXT DEFAULT '',
+    points_cost INTEGER NOT NULL,
+    stock INTEGER DEFAULT 100,
+    category TEXT DEFAULT 'physical',
+    status INTEGER DEFAULT 1,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS point_redemptions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id),
+    item_id INTEGER NOT NULL REFERENCES shop_items(id),
+    item_name TEXT NOT NULL,
+    points_cost INTEGER NOT NULL,
+    quantity INTEGER DEFAULT 1,
+    status INTEGER DEFAULT 0,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS point_records (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id),
+    change INTEGER NOT NULL,
+    reason TEXT NOT NULL,
+    type TEXT DEFAULT 'earn',
+    related_id INTEGER,
+    related_type TEXT,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
 `)
 
 const categoryCount = db.prepare('SELECT COUNT(*) as count FROM categories').get() as { count: number }
@@ -200,8 +258,73 @@ if (helpCount.count === 0) {
   })
 }
 
+const activityCount = db.prepare('SELECT COUNT(*) as count FROM activities').get() as { count: number }
+if (activityCount.count === 0) {
+  const mockActivities = [
+    { title: '周末工具义修日', description: '免费为邻居们提供小家电、自行车、家具等维修服务。带上您需要修理的物品，我们有专业的志愿者团队为您服务！活动现场还提供免费茶水和小点心。', image: 'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=community%20tool%20repair%20event%20neighbors%20helping&image_size=landscape_16_9', location: '社区活动中心 1楼大厅', start_time: '2026-06-28 09:00:00', end_time: '2026-06-28 17:00:00', max_participants: 80, points_reward: 30, status: 1, creator_id: 1 },
+    { title: '邻里聚餐 BBQ 派对', description: '夏日邻里聚餐活动！我们提供烧烤架和基础食材，欢迎大家自带拿手菜来分享。现场有儿童游乐区和音乐表演，让我们一起度过愉快的周末夜晚！', image: 'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=neighborhood%20bbq%20party%20summer%20community&image_size=landscape_16_9', location: '社区中央花园', start_time: '2026-07-05 18:00:00', end_time: '2026-07-05 22:00:00', max_participants: 100, points_reward: 20, status: 1, creator_id: 1 },
+    { title: '社区环保垃圾分类宣传', description: '学习垃圾分类知识，让我们的社区更美好！活动包含垃圾分类知识讲座、互动游戏、手工DIY等环节，参与家庭可获赠分类垃圾桶。', image: 'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=environmental%20recycling%20community%20event%20green&image_size=landscape_16_9', location: '3号楼前小广场', start_time: '2026-07-12 09:30:00', end_time: '2026-07-12 11:30:00', max_participants: 50, points_reward: 15, status: 1, creator_id: 1 },
+    { title: '儿童暑期安全教育讲座', description: '专为5-12岁儿童设计的暑期安全教育，涵盖防溺水、防拐骗、消防安全、交通安全等内容。由社区民警和消防员主讲，互动性强，欢迎家长陪同参加。', image: 'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=children%20safety%20education%20classroom%20community&image_size=landscape_16_9', location: '社区活动室 2楼', start_time: '2026-07-19 14:00:00', end_time: '2026-07-19 16:00:00', max_participants: 60, points_reward: 25, status: 1, creator_id: 1 },
+    { title: '爱心旧物捐赠活动', description: '把闲置的衣物、书籍、玩具捐赠给有需要的人。所有物品将经过消毒整理后捐赠给山区儿童和困难家庭。捐赠者可获得积分奖励和爱心证书。', image: 'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=charity%20donation%20drive%20clothes%20books%20community&image_size=landscape_16_9', location: '社区服务中心门口', start_time: '2026-07-26 10:00:00', end_time: '2026-07-26 16:00:00', max_participants: 200, points_reward: 20, status: 1, creator_id: 1 },
+    { title: '中老年智能手机培训', description: '帮助社区长辈学习使用智能手机，包括微信聊天、视频通话、手机支付、健康码使用等实用技能。一对一教学，耐心细致。', image: 'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=elderly%20learning%20smartphone%20community%20training&image_size=landscape_16_9', location: '社区电教室', start_time: '2026-08-02 09:00:00', end_time: '2026-08-02 11:00:00', max_participants: 30, points_reward: 35, status: 1, creator_id: 1 },
+  ]
+  const insertActivity = db.prepare('INSERT INTO activities (title, description, image, location, start_time, end_time, max_participants, points_reward, status, creator_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+  mockActivities.forEach(a => {
+    insertActivity.run(a.title, a.description, a.image, a.location, a.start_time, a.end_time, a.max_participants, a.points_reward, a.status, a.creator_id)
+  })
+}
+
+const shopItemCount = db.prepare('SELECT COUNT(*) as count FROM shop_items').get() as { count: number }
+if (shopItemCount.count === 0) {
+  const mockItems = [
+    { name: '免费工具借用券（3天）', description: '凭此券可免费借用任意工具3天，无需支付押金。限本人使用，有效期30天。', image: 'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=tool%20borrow%20coupon%20voucher%20orange%20ticket&image_size=square_hd', points_cost: 50, stock: 200, category: 'service', status: 1 },
+    { name: '社区定制帆布袋', description: '温馨邻里社区定制环保帆布袋，印有社区Logo，结实耐用，容量大。适合购物、买菜、通勤。', image: 'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=custom%20canvas%20tote%20bag%20eco%20friendly%20beige&image_size=square_hd', points_cost: 80, stock: 100, category: 'physical', status: 1 },
+    { name: '精美马克杯', description: '社区定制陶瓷马克杯，温暖橙色系设计，350ml容量，微波炉和洗碗机适用。', image: 'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=ceramic%20coffee%20mug%20warm%20orange%20color&image_size=square_hd', points_cost: 60, stock: 150, category: 'physical', status: 1 },
+    { name: '社区互助之星徽章', description: '金属珐琅徽章，社区荣誉象征。仅限积分达到500分以上的居民兑换。佩戴徽章可参加社区VIP活动。', image: 'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=gold%20star%20badge%20honor%20medal%20community&image_size=square_hd', points_cost: 500, stock: 50, category: 'physical', status: 1 },
+    { name: '家政清洁服务（2小时）', description: '专业家政服务人员上门提供2小时家庭清洁服务，包括客厅、卧室、厨房、卫生间清洁。', image: 'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=house%20cleaning%20service%20professional%20cleaner&image_size=square_hd', points_cost: 300, stock: 50, category: 'service', status: 1 },
+    { name: '免费打印券（50张）', description: '社区服务中心免费打印券，可打印黑白文档50张，A4纸。有效期6个月。', image: 'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=printer%20paper%20document%20printing%20voucher&image_size=square_hd', points_cost: 30, stock: 300, category: 'service', status: 1 },
+    { name: '儿童益智绘本套装', description: '精选5本儿童绘本，适合3-8岁儿童阅读，内容涵盖情商培养、科普知识、经典童话。', image: 'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=children%20colorful%20picture%20books%20set%20educational&image_size=square_hd', points_cost: 150, stock: 80, category: 'physical', status: 1 },
+    { name: '绿植小盆栽', description: '多肉植物或绿萝小盆栽，含精美陶瓷花盆，净化空气，美化家居。', image: 'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=small%20potted%20succulent%20plant%20cute%20pot&image_size=square_hd', points_cost: 45, stock: 120, category: 'physical', status: 1 },
+  ]
+  const insertItem = db.prepare('INSERT INTO shop_items (name, description, image, points_cost, stock, category, status) VALUES (?, ?, ?, ?, ?, ?, ?)')
+  mockItems.forEach(item => {
+    insertItem.run(item.name, item.description, item.image, item.points_cost, item.stock, item.category, item.status)
+  })
+}
+
+const participantCount = db.prepare('SELECT COUNT(*) as count FROM activity_participants').get() as { count: number }
+if (participantCount.count === 0) {
+  const mockParticipants = [
+    { activity_id: 1, user_id: 2, status: 1, points_awarded: 0 },
+    { activity_id: 1, user_id: 3, status: 0, points_awarded: 0 },
+    { activity_id: 2, user_id: 4, status: 0, points_awarded: 0 },
+    { activity_id: 2, user_id: 5, status: 0, points_awarded: 0 },
+    { activity_id: 3, user_id: 2, status: 0, points_awarded: 0 },
+  ]
+  const insertParticipant = db.prepare('INSERT INTO activity_participants (activity_id, user_id, status, points_awarded) VALUES (?, ?, ?, ?)')
+  mockParticipants.forEach(p => {
+    insertParticipant.run(p.activity_id, p.user_id, p.status, p.points_awarded)
+  })
+}
+
 export function createNotification(userId: number, title: string, content: string, type: string = 'system') {
   db.prepare('INSERT INTO notifications (user_id, title, content, type) VALUES (?, ?, ?, ?)').run(userId, title, content, type)
+}
+
+export function addPoints(userId: number, points: number, reason: string, relatedId?: number, relatedType?: string) {
+  const stmt = db.prepare('UPDATE users SET points = points + ? WHERE id = ?')
+  stmt.run(points, userId)
+  db.prepare('INSERT INTO point_records (user_id, change, reason, type, related_id, related_type) VALUES (?, ?, ?, ?, ?, ?)').run(
+    userId, points, reason, 'earn', relatedId || null, relatedType || null
+  )
+}
+
+export function deductPoints(userId: number, points: number, reason: string, relatedId?: number, relatedType?: string) {
+  const stmt = db.prepare('UPDATE users SET points = points - ? WHERE id = ?')
+  stmt.run(points, userId)
+  db.prepare('INSERT INTO point_records (user_id, change, reason, type, related_id, related_type) VALUES (?, ?, ?, ?, ?, ?)').run(
+    userId, -points, reason, 'spend', relatedId || null, relatedType || null
+  )
 }
 
 export { db }
